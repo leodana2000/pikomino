@@ -4,8 +4,8 @@ We use dynamic programming to find the optimal solution.
 '''
 
 # Action space
-class Action:
+class params:
     SUM : int
-    IS_WORMS : bool
     PREVIOUS_DICE : list[int]
+    IS_WORMS = 6 in PREVIOUS_DICE
 
