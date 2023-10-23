@@ -14,6 +14,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
     The table has shape (accept_r, took_1, took_2, took_3, took_4, took_5, took_6, max_sum - min_sum)
     '''
 
+    # To reduce complexity, we keep track of the minimal and maximal possible sum of dice.
     min_sum = max_dice-nb_dice
     max_sum = 6*(max_dice-nb_dice) + 1
     table = torch.zeros((2, 2, 2, 2, 2, 2, 2, max_sum-min_sum))
@@ -21,19 +22,19 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
     # init the table, in case you pick the reward and you have picked a 6 before
     # otherwise you get the pen
     for r in range(max_sum - min_sum):
-        if r < min_score:
+        if r < min_score-min_sum:
             table[1, :, :, :, :, :, 1, r] = pen
-        elif r > max_score:
-            table[1, :, :, :, :, :, 1, r] = reward_vect[max_score]
+        elif r > max_score-min_sum:
+            table[1, :, :, :, :, :, 1, r] = reward_vect[max_score-min_score]
         else:
-            table[1, :, :, :, :, :, 1, r] = reward_vect[r]
-        table[1, :, :, :, :, :, 0, r-min_sum] = pen
+            table[1, :, :, :, :, :, 1, r] = reward_vect[r-min_score]
+        table[1, :, :, :, :, :, 0, r] = pen
 
 
     # We compute the table backward.
     if nb_dice == 0:
         # Table at position 0 is directly returned.
-        table[0] += -1000
+        table[0] += -np.inf
         return [table]
     else:
         # Otherwise we get the previous tables.
@@ -47,6 +48,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
     for sym_throw, proba in tqdm(zip(sym_throws, probas)):
         for cond in conditions:
             for sum in range(max_sum-min_sum):
+
                 # Computes the reward of all actions. 
                 Qs = []
                 for i, d in enumerate(sym_throw):
@@ -57,10 +59,9 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
 
                     # Otherwise, add the condition and get the previous reward.
                     else:
-                        if cond == [0,0,0,0,0,0]:
-                            print(tables[nb_dice-d][:, *cond])
-                        cond[i] = 1
-                        Qs.append(max(tables[nb_dice-d][:, *cond, sum + i*d]).item())
+                        new_cond = np.copy(cond)
+                        new_cond[i] = 1
+                        Qs.append(max(tables[nb_dice-d][:, *new_cond, sum + i*d]).item())
 
                 table[0, *cond, sum] += max(Qs)*proba
     
@@ -97,18 +98,14 @@ def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], sym = False):
         return syms, probas
     else:
         return throws
-    
-t = time()
-pen = 0
-nb_dice = 3
-tables = init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=0, max_score=15)
-print("Took {} second to compute.".format(time() - t))
+
 
 def throw_dice(nb_dice, seed = 42):
     rng = np.random.default_rng(seed=seed)
     throw = [rng.integers(1, 6+1) for _ in range(nb_dice)]
     sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
     return sym_throw
+
 
 def get_opt_action(tables, throw, pen, cond = [0,0,0,0,0,0], sum = 0, nb_dice = 8):
     Qs = []
@@ -122,8 +119,11 @@ def get_opt_action(tables, throw, pen, cond = [0,0,0,0,0,0], sum = 0, nb_dice = 
     print(Qs)
     return torch.argmax(torch.Tensor(Qs), dim = -1).item() + 1
 
-print(tables[3][0, *[0,0,0,0,0,0], 0])
-print(tables[1][0, *[1,0,0,0,0,0], 2])
-print(tables[0][1, *[1,0,0,0,0,1], 8])
 
-print(get_opt_action(tables, [1, 5, 1], pen, nb_dice = nb_dice))
+t = time()
+pen = -3
+nb_dice = 8
+tables = init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=21, max_score=36)
+print("Took {} second to compute.".format(time() - t))
+
+print(get_opt_action(tables, [1, 3, 3, 3, 3, 4, 4, 5], pen, nb_dice = nb_dice))
