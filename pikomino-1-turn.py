@@ -6,6 +6,7 @@ We use dynamic programming to find the optimal solution.
 from itertools import product
 from tqdm import tqdm
 import torch
+import numpy as np
 from time import time
 
 def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_score = 36):
@@ -19,22 +20,24 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
 
     # init the table, in case you pick the reward and you have picked a 6 before
     # otherwise you get the pen
-    for r in range(min_sum, max_sum):
+    for r in range(max_sum - min_sum):
         if r < min_score:
-            table[1, :, :, :, :, :, 1, r-min_sum] = pen
+            table[1, :, :, :, :, :, 1, r] = pen
+        elif r > max_score:
+            table[1, :, :, :, :, :, 1, r] = reward_vect[max_score]
         else:
-            table[1, :, :, :, :, :, 1, r-min_sum] = min(r, max_score)
+            table[1, :, :, :, :, :, 1, r] = reward_vect[r]
         table[1, :, :, :, :, :, 0, r-min_sum] = pen
 
 
     # We compute the table backward.
     if nb_dice == 0:
         # Table at position 0 is directly returned.
-        table[0] += -100
+        table[0] += -1000
         return [table]
     else:
         # Otherwise we get the previous tables.
-        tables = init_table(reward_vect, pen, nb_dice = nb_dice - 1) 
+        tables = init_table(reward_vect, pen, max_dice = max_dice, nb_dice = nb_dice - 1, min_score = min_score, max_score = max_score) 
     
     # Get the symetric throws and all possible conditions.
     sym_throws, probas = get_throws(nb_dice, sym = True)
@@ -44,7 +47,6 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
     for sym_throw, proba in tqdm(zip(sym_throws, probas)):
         for cond in conditions:
             for sum in range(max_sum-min_sum):
-                
                 # Computes the reward of all actions. 
                 Qs = []
                 for i, d in enumerate(sym_throw):
@@ -53,19 +55,20 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
                     if cond[i] == 1 or d == 0:
                         Qs.append(pen)
 
-                    # Otherwise, add the condition aand get the previous reward.
+                    # Otherwise, add the condition and get the previous reward.
                     else:
+                        if cond == [0,0,0,0,0,0]:
+                            print(tables[nb_dice-d][:, *cond])
                         cond[i] = 1
-                        Qs.append(max(tables[-d][:, cond[0], cond[1], cond[2], cond[3], cond[4], cond[5], sum + (i+1)*d - d]))
-                
-                # Adds the weigthed reward to the.
-                table[0, cond[0], cond[1], cond[2], cond[3], cond[4], cond[5], sum] += max(Qs)*proba
+                        Qs.append(max(tables[nb_dice-d][:, *cond, sum + i*d]).item())
+
+                table[0, *cond, sum] += max(Qs)*proba
     
     tables.append(table)
     return tables
 
 
-def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], proba = 6**-8, sym = False):
+def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], sym = False):
     '''
     Either construct the powerset of a set, or the ordering independent powerset.
     '''
@@ -74,6 +77,7 @@ def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], proba = 6**-8, sym = False):
     syms = []
     probas = []
     dices = [dice for _ in range(nb_dice)]
+    proba = 6**-nb_dice
     
     for d in product(*dices):
         # Enumerate all throws
@@ -95,5 +99,31 @@ def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], proba = 6**-8, sym = False):
         return throws
     
 t = time()
-init_table([1 for i in range(21, 36+1)], -1)
+pen = 0
+nb_dice = 3
+tables = init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=0, max_score=15)
 print("Took {} second to compute.".format(time() - t))
+
+def throw_dice(nb_dice, seed = 42):
+    rng = np.random.default_rng(seed=seed)
+    throw = [rng.integers(1, 6+1) for _ in range(nb_dice)]
+    sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
+    return sym_throw
+
+def get_opt_action(tables, throw, pen, cond = [0,0,0,0,0,0], sum = 0, nb_dice = 8):
+    Qs = []
+    sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
+    for i, d in enumerate(sym_throw):
+        if cond[i] == 1 or d == 0:
+            Qs.append(pen)
+        else:
+            cond[i] = 1
+            Qs.append(max(tables[nb_dice-d][:, *cond, sum + i*d]).item())
+    print(Qs)
+    return torch.argmax(torch.Tensor(Qs), dim = -1).item() + 1
+
+print(tables[3][0, *[0,0,0,0,0,0], 0])
+print(tables[1][0, *[1,0,0,0,0,0], 2])
+print(tables[0][1, *[1,0,0,0,0,1], 8])
+
+print(get_opt_action(tables, [1, 5, 1], pen, nb_dice = nb_dice))
