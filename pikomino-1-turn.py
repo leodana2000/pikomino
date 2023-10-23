@@ -36,6 +36,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
         # Otherwise we get the previous tables.
         tables = init_table(reward_vect, pen, nb_dice = nb_dice - 1) 
     
+    # Get the symetric throws and all possible conditions.
     sym_throws, probas = get_throws(nb_dice, sym = True)
     conditions = get_throws(6, [0, 1])
 
@@ -43,28 +44,42 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8, min_score = 21, max_
     for sym_throw, proba in tqdm(zip(sym_throws, probas)):
         for cond in conditions:
             for sum in range(max_sum-min_sum):
+                
+                # Computes the reward of all actions. 
                 Qs = []
                 for i, d in enumerate(sym_throw):
+
+                    # Impossible actions get very negative reward.
                     if cond[i] == 1 or d == 0:
                         Qs.append(pen)
+
+                    # Otherwise, add the condition aand get the previous reward.
                     else:
                         cond[i] = 1
                         Qs.append(max(tables[-d][:, cond[0], cond[1], cond[2], cond[3], cond[4], cond[5], sum + (i+1)*d - d]))
+                
+                # Adds the weigthed reward to the.
                 table[0, cond[0], cond[1], cond[2], cond[3], cond[4], cond[5], sum] += max(Qs)*proba
     
     tables.append(table)
     return tables
 
 
-def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], sym = False):
+def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6], proba = 6**-8, sym = False):
+    '''
+    Either construct the powerset of a set, or the ordering independent powerset.
+    '''
+
     throws = []
     syms = []
     probas = []
     dices = [dice for _ in range(nb_dice)]
-    proba = 6**-8
     
     for d in product(*dices):
+        # Enumerate all throws
         throws.append(list(d))
+
+        # Keep only the meaningfully different throws: permutation indepenent.
         if sym:
             sym_throw = [throws[-1].count(roll) for roll in range(1, 1+6)]
             if sym_throw in syms:
