@@ -6,15 +6,17 @@ t = time()
 nb_dice = 8
 min_score = 21
 max_score = 36
-tables_0 = p1.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], 0, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
+pen = 0
+tables_0 = p1.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
 print("Took {} second to compute.".format(time() - t)) # Answer: 64s
 
 throw = [1, 3, 3, 3, 3, 4, 4, 5]
-print("The optimal action for pen={}, and throw {}, is {}.".format(0, throw, p1.get_opt_action(tables_0, throw, 0, nb_dice = nb_dice))) # Answer: 1
+print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1.get_opt_action(tables_0, throw, pen, nb_dice = nb_dice))) # Answer: 1
 del tables_0
 
-tables_m3 = p1.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], -3, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
-print("The optimal action for pen={}, and throw {}, is {}.".format(-3, throw, p1.get_opt_action(tables_m3, throw, -3, nb_dice = nb_dice))) # Answer: 1
+pen = -3
+tables_m3 = p1.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
+print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1.get_opt_action(tables_m3, throw, pen, nb_dice = nb_dice))) # Answer: 1
 del tables_m3
 
 pen = 0
@@ -39,7 +41,7 @@ proba_p_4 = table_4[nb_dice][0, *cond, 0]
 print("The probability to obtain a pikomino with a value 4 is {}.".format(proba_p_4))           # Answer: 0.81
 del table_4
 
-tile_24 = p1.init_table([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
+tile_24 = p1.init_table([0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score, limit=True)
 p_24 = tile_24[nb_dice][0, *cond, 0]
 print("The probability to obtain exactly tile 24 is {}.".format(p_24))                          # Answer: 0.19
 del tile_24
