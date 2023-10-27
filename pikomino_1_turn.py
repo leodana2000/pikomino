@@ -50,7 +50,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8,
     if nb_cond <= 1:
         if nb_dice == 0:
             # If there is not dice left to play and one condition, then start the tables.
-            table[0] += -np.inf
+            table[0] += pen
             return [[table]]
         
         else:
@@ -67,7 +67,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8,
         
         if nb_dice == 0 or nb_cond == 6:
             # And in the case of 0 nb_dice or 6 nb_cond, we don't have to compute the table since we cannot throw dice. 
-            table[0] += -np.inf
+            table[0] += pen
             tables[nb_dice].append(table)
             return tables
 
@@ -77,8 +77,6 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8,
 
     # Get the symetric throws and all possible conditions.
     sym_throws, probas = get_throws(nb_dice)
-
-    print(nb_dice, nb_cond)
 
     for sym_throw, proba in zip(sym_throws, probas):
         for cond in range(cond_range):
@@ -91,7 +89,7 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8,
 
                     # Impossible actions get very negative reward.
                     if contains(cond_list[nb_cond], cond, dice) or nb_d == 0:
-                        Qs.append(-np.inf)
+                        Qs.append(pen)
 
                     # Otherwise, add the condition and get the previous reward.
                     else:
@@ -109,12 +107,22 @@ def init_table(reward_vect, pen, max_dice = 8, nb_dice = 8,
 
 
 def contains(cond_list, cond, dice):
+    '''
+    Returns if the dice we want to choose was already picked.
+    '''
     return dice in cond_list[cond]
 
 
 def add_condition(cond_list, nb_cond, dice, cond):
+    '''
+    Transform the condition number with nb_cond, to a condition number with nb_cond+1 conditions.
+    '''
     next_cond = cond_list[nb_cond+1]
+
+    # Finds what is the list of dice corresponding to that condition. !in-place operation!
     dice_cond = list(np.copy(cond_list[nb_cond][cond]))
+
+    # Adds the current dice at the right place in the condition.
     flag = True
     for i, d in enumerate(dice_cond):
         if d<dice and flag:
@@ -123,14 +131,23 @@ def add_condition(cond_list, nb_cond, dice, cond):
             break
     if flag:
         dice_cond.append(dice)
+
+    # Finds the indice of this new condition.
     return next_cond.index(dice_cond)
 
 
 def init_cond(nb_cond, dices = [1, 2, 3, 4, 5, 6]):
+    '''
+    A function that initializes the list of conditions: all decreasingly ordered tuples of nb_cond dices.
+    '''
+
     cond_list = []
+
     if nb_cond == 0:
+        # No condition, no dices.
         cond_list.append([])
         return cond_list
+    
     for i, dice in enumerate(dices):
         if len(dices[i+1:]) >= nb_cond-1:
             pre_list = init_cond(nb_cond-1, dices = dices[i+1:])
@@ -168,30 +185,35 @@ def get_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6]):
 
 
 def throw_dice(nb_dice, seed = 42):
+    '''
+    Computes a random sample of nb_dice, and return the symetric throw form.
+    '''
     rng = np.random.default_rng(seed=seed)
     throw = [rng.integers(1, 6+1) for _ in range(nb_dice)]
     sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
     return sym_throw
 
 
-def get_opt_action(tables, throw, pen, cond = [0,0,0,0,0,0], sum = 0, nb_dice = 8):
-    Qs = []
+def get_opt_action(tables, throw, cond, nb_cond, pen, sum = 0, nb_dice = 8):
+    '''
+    Given a throw, nb_dice and a condition, return what is the best dice to pick.
+    '''
     sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
-    for i, d in enumerate(sym_throw):
-        if cond[i] == 1 or d == 0:
+    cond_list = [init_cond(i) for i in range(0, 6+1)]
+    ind_cond = nb_cond-1
+
+    Qs = []
+    for i, nb_d in enumerate(sym_throw):
+        dice = i+1
+
+        # Impossible actions get very negative reward.
+        if contains(cond_list[nb_cond], cond, dice) or nb_d == 0:
             Qs.append(pen)
+
+        # Otherwise, add the condition and get the previous reward.
         else:
-            cond[i] = 1
-            Qs.append(max(tables[nb_dice-d][:, *cond, sum + i*d]).item())
+            new_cond = add_condition(cond_list, nb_cond, dice, cond)
+            Qs.append(max(tables[nb_dice-nb_d][ind_cond+1][:, new_cond, sum + nb_d*dice - nb_d]).item())
+
     print(Qs)
     return torch.argmax(torch.Tensor(Qs), dim = -1).item() + 1
-
-
-t = time()
-throw = [1, 3, 3, 3, 3, 4, 4, 5]
-nb_dice = 8
-min_score = 21
-max_score = 36
-pen = -3
-tables_m3 = init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
-print(time()-t)
