@@ -17,12 +17,12 @@ tables_0 = p1t.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_
 print("Took {} second to compute.".format(time() - t)) # Answer: 64s
 
 throw = [1, 3, 3, 3, 3, 4, 4, 5]
-print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1t.get_opt_action(tables_0, throw, cond, nb_cond, pen, cond_list, sum, nb_dice, max_dice))) # Answer: 3
+print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1t.get_opt_action(throw, tables_0, pen, cond, nb_cond, cond_list, sum, nb_dice, max_dice))) # Answer: 3
 del tables_0
 
 pen = -3
 tables_m3 = p1t.init_table([1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4], pen, max_dice = nb_dice, nb_dice = nb_dice, min_score=min_score, max_score=max_score)
-print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1t.get_opt_action(tables_m3, throw, cond, nb_cond, pen, cond_list, sum, nb_dice, max_dice))) # Answer: 3
+print("The optimal action for pen={}, and throw {}, is {}.".format(pen, throw, p1t.get_opt_action(throw, tables_m3, pen, cond, nb_cond, cond_list, sum, nb_dice, max_dice))) # Answer: 3
 del tables_m3
 
 pen = 0

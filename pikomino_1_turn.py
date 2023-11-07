@@ -1,8 +1,7 @@
-'''
+"""
 Implements optimal strategy for pikomino in one turn.
 We use dynamic programming to find the optimal solution.
-...
-'''
+"""
 
 from itertools import product
 import torch as t
@@ -12,7 +11,7 @@ import math
 def init_table(reward_vect : list[float], pen : float, max_dice = 8, nb_dice = 8, 
                min_score = 21, max_score = 36, nb_cond = 0, 
                cond_list = None, limit=False):
-    '''
+    """
     The output table has shape (accept_r, binom(6, nb_cond), max_sum-min_sum)
 
     Arguments
@@ -25,14 +24,14 @@ def init_table(reward_vect : list[float], pen : float, max_dice = 8, nb_dice = 8
     - nb_cond: the current number of conditions satisfied (different dice chosen),
     - cond_list: 
     - limit: 
-    '''
+    """
+    
 
     # To reduce complexity, we keep track of the minimal and maximal possible sum of dice.
     dice_used = max_dice-nb_dice
     min_sum = dice_used
     max_sum = 6*(dice_used) + 1
     cond_range = math.comb(6, nb_cond)
-    ind_cond = nb_cond-1
     table = t.zeros((2, cond_range, max_sum-min_sum))
 
     # When initiating the function, we first compute all the condition tables.
@@ -92,7 +91,17 @@ def init_table(reward_vect : list[float], pen : float, max_dice = 8, nb_dice = 8
             for sum in range(max_sum-min_sum):
 
                 # Computes the reward of all actions. 
-                Qs = compute_Qs(sym_throw, cond_list, nb_cond, cond, pen, ind_cond, tables, nb_dice, sum + min_sum, max_dice)
+                Qs = compute_Qs(
+                    sym_throw, 
+                    tables = tables,
+                    pen = pen,
+                    cond = cond,
+                    nb_cond = nb_cond,
+                    cond_list = cond_list,
+                    sum = sum + min_sum, 
+                    max_dice = max_dice, 
+                    nb_dice = nb_dice,
+                )
 
                 table[0, cond, sum] += t.max(Qs)*proba
     
@@ -106,17 +115,18 @@ def init_table(reward_vect : list[float], pen : float, max_dice = 8, nb_dice = 8
 
 
 
-def contains(cond_list, cond, dice):
-    '''
+def contains(cond_list : list[list[int]], cond : int, dice : int):
+    """
     Returns if the dice we want to choose was already picked.
-    '''
+    """
     return dice in cond_list[cond]
 
 
-def add_condition(cond_list, nb_cond, dice, cond):
-    '''
+
+def add_condition(cond_list : list[list[int]], nb_cond : int, dice : int, cond : int):
+    """
     Transform the condition number with nb_cond, to a condition number with nb_cond+1 conditions.
-    '''
+    """
     next_cond = cond_list[nb_cond+1]
 
     # Finds what is the list of dice corresponding to that condition. !in-place operation!
@@ -136,12 +146,13 @@ def add_condition(cond_list, nb_cond, dice, cond):
     return next_cond.index(dice_cond)
 
 
-def init_cond(nb_cond, dices = [1, 2, 3, 4, 5, 6]):
-    '''
-    A function that initializes the list of conditions: all decreasingly ordered tuples of nb_cond dices.
-    '''
 
-    cond_list = []
+def init_cond(nb_cond : int, dices = [1, 2, 3, 4, 5, 6]):
+    """
+    A function that initializes the list of conditions: all decreasingly ordered tuples of nb_cond dices.
+    """
+
+    cond_list : list[int] | list = []
 
     if nb_cond == 0:
         # No condition, no dices.
@@ -157,23 +168,23 @@ def init_cond(nb_cond, dices = [1, 2, 3, 4, 5, 6]):
     return cond_list
 
 
-def init_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6]):
-    '''
-    Construct the powerset of a set and then order into independent powerset.
-    '''
 
-    throws = []
-    syms = []
-    probas = []
+def init_throws(nb_dice : int, dice = [1, 2, 3, 4, 5, 6]):
+    """
+    Construct the powerset of a set and then order into independent powerset.
+    """
+
+    syms : list[list[int]] = []
+    probas : list[float] = []
     dices = [dice for _ in range(nb_dice)]
     proba = 6**-nb_dice
     
     for d in product(*dices):
         # Enumerate all throws
-        throws.append(list(d))
+        throw = list(d)
 
         # Keep only the meaningfully different throws: permutation indepenent.
-        sym_throw = [throws[-1].count(roll) for roll in range(1, 1+6)]
+        sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
         if sym_throw in syms:
             probas[syms.index(sym_throw)] += proba 
         else:
@@ -184,41 +195,65 @@ def init_throws(nb_dice, dice = [1, 2, 3, 4, 5, 6]):
     return syms, probas
 
 
+
 def throw_dice(nb_dice : int, rng):
-    '''
+    """
     Computes a random sample of nb_dice, and return the symetric throw form.
-    '''
+    """
     throw = [rng.integers(1, 6+1) for _ in range(nb_dice)]
     return throw
 
 
-def compute_Qs(sym_throw, cond_list, nb_cond, cond, pen, ind_cond, tables, nb_dice, sum, max_dice):
+
+def compute_Qs(sym_throw : list[int], **kwargs):
+    """
+    Compute the expected reward vector for each action of a throw.
+
+    sym_throw is a list of len 6, index i represent the number of dice i+1 in the throw.
+    """
+
     Qs = []
-    norm_sum = sum - (max_dice - nb_dice)
+    norm_sum = kwargs["sum"] - (kwargs["max_dice"] - kwargs["nb_dice"])
+
     for i, nb_d in enumerate(sym_throw):
         dice = i+1
 
-        # Impossible actions get very negative reward.
-        if contains(cond_list[nb_cond], cond, dice) or nb_d == 0:
-            Qs.append(t.tensor([-np.inf, pen-(1e-4)], dtype=t.float).unsqueeze(-1))
+        # Impossible actions (no dice, of already chosen dice) get negative reward.
+        if contains(kwargs["cond_list"][kwargs["nb_cond"]], kwargs["cond"], dice) or nb_d == 0:
+            Qs.append(t.tensor([-np.inf, kwargs["pen"]-(1e-4)], dtype=t.float).unsqueeze(-1))
 
         # Otherwise, add the condition and get the previous reward.
         else:
-            new_cond = add_condition(cond_list, nb_cond, dice, cond)
-            Qs.append(tables[nb_dice-nb_d][ind_cond+1][:, new_cond, norm_sum + nb_d*dice - nb_d].unsqueeze(-1))
+            new_cond = add_condition(kwargs["cond_list"], kwargs["nb_cond"], dice, kwargs["cond"])
+            Qs.append(kwargs["tables"][kwargs["nb_dice"]-nb_d][kwargs["nb_cond"]][:, new_cond, norm_sum + nb_d*dice - nb_d].unsqueeze(-1))
+
     Qs = t.cat(Qs, dim=-1)
     return Qs
 
 
-def get_opt_action(tables, throw, cond, nb_cond, pen, cond_list, sum, nb_dice, max_dice):
-    '''
-    Given a throw, nb_dice and a condition, return what is the best dice to pick.
-    '''
-    sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
-    ind_cond = nb_cond-1
 
-    Qs = compute_Qs(sym_throw, cond_list, nb_cond, cond, pen, ind_cond, tables, nb_dice, sum, max_dice)
-    print(Qs)
+def get_opt_action(throw : list[int], tables : list[list[t.Tensor]], pen : float, 
+                   cond : int, nb_cond : int, cond_list : list[list[int]], 
+                   sum : int, nb_dice : int, max_dice : int):
+    """
+    Given a throw, nb_dice and a condition, return what is the best dice to pick.
+
+    throw is the list of len nb_dice of consecutive random roll.
+    """
+
+    sym_throw = [throw.count(roll) for roll in range(1, 1+6)]
+
+    Qs = compute_Qs(
+        sym_throw, 
+        tables = tables,
+        pen = pen,
+        cond = cond,
+        nb_cond = nb_cond,
+        cond_list = cond_list,
+        sum = sum, 
+        max_dice = max_dice, 
+        nb_dice = nb_dice,
+    )
     args = t.argmax(Qs, dim=-1)
 
     if Qs[0, args[0]] > Qs[1, args[1]]:

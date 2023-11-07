@@ -45,13 +45,13 @@ class One_turn_agent:
             print("Throw n°{} is {}.".format(ind_throw, throw))
 
             action = p1t.get_opt_action(
-                self.tables, 
-                throw, 
-                cond, 
-                nb_cond, 
+                throw,
+                self.tables,
                 self.pen,
+                cond,
+                nb_cond,
                 self.cond_list,
-                sum,
+                sum, 
                 dice_left,
                 self.max_dice,
             )
@@ -99,6 +99,7 @@ max_score = 36
 reward = [float(i) for i in range(min_score, max_score+1)]
 pen = 0
 max_dice = 8
+
 agent = One_turn_agent(
     reward, 
     pen, 
@@ -106,4 +107,5 @@ agent = One_turn_agent(
     min_score, 
     max_score,
 )
+
 agent.play()
